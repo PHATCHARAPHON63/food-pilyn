@@ -3,7 +3,9 @@
 // ============================================
 
 export const WITH_RICE_CATEGORY = 'side-dish' as const;
+export const EXTRA_CATEGORY = 'extra' as const;
 export const RICE_CURRY_CATEGORY = 'rice-curry' as const;
+export const EXTRA_PICKER_OPTION_NAME = 'เพิ่มเติม';
 export const CURRY_COUNT_OPTION_NAME = 'จำนวนแกง';
 export const WITH_RICE_PICKER_OPTION_NAME = 'กับข้าวที่เลือก';
 

@@ -12,6 +12,7 @@ const EMPTY_PRODUCT: Product = {
   description: '',
   basePrice: 0,
   category: 'rice-curry',
+  mealPeriod: 'both',
   isAvailable: true,
   options: [],
 };

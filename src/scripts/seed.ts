@@ -31,15 +31,6 @@ const RICE_CURRY_OPTIONS = [
       { label: '3 อย่าง', priceAdjustment: 30 },
     ],
   },
-  {
-    name: 'เพิ่มไข่ดาว',
-    type: 'single' as const,
-    required: false,
-    choices: [
-      { label: 'ไม่ใส่', priceAdjustment: 0 },
-      { label: 'ไข่ดาว', priceAdjustment: 10 },
-    ],
-  },
 ];
 
 function withRice(
@@ -53,6 +44,7 @@ function withRice(
     description,
     basePrice,
     category: 'side-dish',
+    mealPeriod: 'both',
     isAvailable: true,
     options,
   };
@@ -68,6 +60,23 @@ function recommended(
     description,
     basePrice,
     category: 'other',
+    mealPeriod: 'both',
+    isAvailable: true,
+    options: [],
+  };
+}
+
+function extraItem(
+  name: string,
+  basePrice: number,
+  description = 'รายการเพิ่มเติม'
+): Omit<ProductType, '_id'> {
+  return {
+    name,
+    description,
+    basePrice,
+    category: 'extra',
+    mealPeriod: 'both',
     isAvailable: true,
     options: [],
   };
@@ -80,9 +89,13 @@ const SAMPLE_MENUS: Omit<ProductType, '_id'>[] = [
     description: 'ข้าวสวยร้อน ๆ เลือกกับข้าวราดตามใจ',
     basePrice: 35,
     category: 'rice-curry',
+    mealPeriod: 'both',
     isAvailable: true,
     options: RICE_CURRY_OPTIONS,
   },
+
+  extraItem('ข้าวเปล่า', 5, 'เพิ่มข้าวสวย'),
+  extraItem('ไข่ดาว', 10),
 
   recommended('ข้าวมันไก่ต้ม', 45),
   recommended('ข้าวมันไก่ย่าง', 45),

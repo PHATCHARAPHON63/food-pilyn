@@ -11,10 +11,12 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { formatPrice } from '@/lib/utils';
 import type { Product } from '@/types';
+import { MEAL_PERIOD_LABELS, normalizeMealPeriod } from '@/lib/meal-period';
 
 const CATEGORY_LABELS: Record<Product['category'], string> = {
   'rice-curry': 'ข้าวราดแกง',
   'side-dish': 'กับข้าว',
+  extra: 'เพิ่มเติม',
   other: 'เมนูแนะนำ',
 };
 
@@ -85,7 +87,8 @@ export default function AdminMenuPage() {
             <div>
               <p className="font-semibold text-navy">{product.name}</p>
               <p className="text-sm text-muted">
-                {CATEGORY_LABELS[product.category]} · {formatPrice(product.basePrice)}
+                {CATEGORY_LABELS[product.category]} · {formatPrice(product.basePrice)} ·{' '}
+                {MEAL_PERIOD_LABELS[normalizeMealPeriod(product.mealPeriod)]}
                 {product.category === 'rice-curry' && ` · ${product.options.length} ตัวเลือก`}
               </p>
             </div>

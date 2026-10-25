@@ -9,6 +9,7 @@ const OptionChoiceSchema = new Schema<OptionChoice>(
   {
     label: { type: String, required: true },
     priceAdjustment: { type: Number, default: 0 },
+    mealPeriod: { type: String, enum: ['morning', 'lunch', 'both'] },
   },
   { _id: true }
 );
@@ -31,8 +32,13 @@ const ProductSchema = new Schema<Product>(
     image: { type: String },
     category: {
       type: String,
-      enum: ['rice-curry', 'side-dish', 'other'],
+      enum: ['rice-curry', 'side-dish', 'extra', 'other'],
       default: 'rice-curry',
+    },
+    mealPeriod: {
+      type: String,
+      enum: ['morning', 'lunch', 'both'],
+      default: 'both',
     },
     isAvailable: { type: Boolean, default: true },
     options: [ProductOptionSchema],

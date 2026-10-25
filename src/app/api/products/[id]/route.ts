@@ -33,7 +33,16 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = await req.json();
     const update: Record<string, unknown> = {};
-    const allowed = ['name', 'description', 'basePrice', 'image', 'category', 'isAvailable', 'options'] as const;
+    const allowed = [
+      'name',
+      'description',
+      'basePrice',
+      'image',
+      'category',
+      'mealPeriod',
+      'isAvailable',
+      'options',
+    ] as const;
     for (const key of allowed) {
       if (key in body) update[key] = body[key];
     }

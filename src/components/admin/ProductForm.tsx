@@ -9,7 +9,8 @@ import { useRouter } from 'next/navigation';
 import { Plus, Trash2, Save, ArrowLeft } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import type { Product, ProductOption, OptionChoice } from '@/types';
+import type { Product, ProductOption, OptionChoice, MealPeriod } from '@/types';
+import { MEAL_PERIOD_LABELS } from '@/lib/meal-period';
 
 function createEmptyOption(): ProductOption {
   return {
@@ -52,6 +53,7 @@ export default function ProductForm({ initial, title }: ProductFormProps) {
       basePrice: editing.basePrice,
       image: editing.image,
       category: editing.category,
+      mealPeriod: editing.mealPeriod || 'both',
       isAvailable: editing.isAvailable,
       options: editing.options,
     };
@@ -154,9 +156,30 @@ export default function ProductForm({ initial, title }: ProductFormProps) {
           >
             <option value="rice-curry">ข้าวราดแกง (ชุดข้าว — ลูกค้าเลือกจากเมนูกับข้าว)</option>
             <option value="side-dish">กับข้าว (แสดงในหน้าสั่ง + เป็นตัวเลือกตอนราดข้าว)</option>
+            <option value="extra">เพิ่มเติม (ข้าวเปล่า ไข่ดาว — หน้าสั่ง + เลือกเสริมตอนสั่งเมนู)</option>
             <option value="other">อื่น ๆ</option>
           </select>
         </div>
+
+        {(editing.category === 'side-dish' ||
+          editing.category === 'extra' ||
+          editing.category === 'other' ||
+          editing.category === 'rice-curry') && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-navy">ช่วงขาย</label>
+            <select
+              value={editing.mealPeriod || 'both'}
+              onChange={(e) =>
+                setEditing({ ...editing, mealPeriod: e.target.value as MealPeriod })
+              }
+              className="w-full rounded-xl border border-border bg-card p-3 text-navy"
+            >
+              <option value="both">{MEAL_PERIOD_LABELS.both}</option>
+              <option value="morning">{MEAL_PERIOD_LABELS.morning}</option>
+              <option value="lunch">{MEAL_PERIOD_LABELS.lunch}</option>
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-sm font-medium text-navy">คำอธิบาย</label>
@@ -188,7 +211,8 @@ export default function ProductForm({ initial, title }: ProductFormProps) {
             </Button>
           </div>
           <p className="text-sm text-muted">
-            ข้าวราดแกง: ตั้งตัวเลือกชื่อ「จำนวนแกง」(1/2/3 อย่าง) — รายการที่ให้เลือกดึงจากเมนูหมวด「กับข้าว」เสมอ
+            ข้าวราดแกง: ตั้งตัวเลือกชื่อ「จำนวนแกง」(1/2/3 อย่าง) — กับข้าวดึงจากหมวด「กับข้าว」 เพิ่มเติมดึงจากหมวด「เพิ่มเติม」
+            ตั้งช่วงขายที่ตัวเลือกย่อยได้ถ้าขายไม่ตลอดทั้งเมนู
           </p>
 
           {editing.options.map((option, optIdx) => (
@@ -229,20 +253,36 @@ export default function ProductForm({ initial, title }: ProductFormProps) {
 
               <div className="space-y-2 pl-2">
                 {option.choices.map((choice, cIdx) => (
-                  <div key={cIdx} className="flex gap-2">
+                  <div key={cIdx} className="flex flex-wrap gap-2 sm:flex-nowrap">
                     <Input
                       value={choice.label}
                       onChange={(e) => updateChoice(optIdx, cIdx, { label: e.target.value })}
                       placeholder="ชื่อตัวเลือกย่อย"
-                      className="flex-1"
+                      className="min-w-0 flex-1"
                     />
                     <Input
                       type="number"
                       value={choice.priceAdjustment}
                       onChange={(e) => updateChoice(optIdx, cIdx, { priceAdjustment: Number(e.target.value) })}
                       placeholder="+/- ราคา"
-                      className="w-28"
+                      className="w-24 sm:w-28"
                     />
+                    <select
+                      value={choice.mealPeriod || 'inherit'}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updateChoice(optIdx, cIdx, {
+                          mealPeriod: v === 'inherit' ? undefined : (v as MealPeriod),
+                        });
+                      }}
+                      className="w-full rounded-xl border border-border bg-card p-2 text-sm text-navy sm:w-40"
+                      title="ช่วงขายตัวเลือก"
+                    >
+                      <option value="inherit">ช่วงขายตามเมนู</option>
+                      <option value="both">{MEAL_PERIOD_LABELS.both}</option>
+                      <option value="morning">{MEAL_PERIOD_LABELS.morning}</option>
+                      <option value="lunch">{MEAL_PERIOD_LABELS.lunch}</option>
+                    </select>
                     <button
                       type="button"
                       onClick={() => removeChoice(optIdx, cIdx)}

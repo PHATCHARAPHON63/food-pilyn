@@ -1,6 +1,7 @@
 // ============================================
 // Menu Selector Modal
 // ข้าวราดแกง: เลือกจำนวนแกง แล้วเลือกจากเมนูกับข้าว (side-dish)
+// เพิ่มเติม: เลือกจากหมวด extra (หลายรายการ)
 // เมนูอื่น: ตัวเลือกตามที่ตั้งใน product.options
 // ============================================
 'use client';
@@ -10,35 +11,64 @@ import { X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { formatPrice } from '@/lib/utils';
 import {
+  choiceMatchesMealSlot,
+  type MealPeriodSlot,
+} from '@/lib/meal-period';
+import {
   WITH_RICE_CATEGORY,
+  EXTRA_CATEGORY,
   CURRY_COUNT_OPTION_NAME,
   WITH_RICE_PICKER_OPTION_NAME,
+  EXTRA_PICKER_OPTION_NAME,
   RICE_CURRY_CATEGORY,
   parseCurrySlotCount,
 } from '@/lib/rice-curry';
-import type { Product, ProductOption, OptionChoice, OrderItem } from '@/types';
+import type { Product, ProductOption, OptionChoice, OrderItem, MealPeriod } from '@/types';
 
 interface MenuSelectorProps {
   product: Product | null;
+  mealPeriodSlot: MealPeriodSlot;
   onClose: () => void;
   onAdd: (item: OrderItem) => void;
 }
 
-export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorProps) {
+function filterOptionForSlot(
+  option: ProductOption,
+  productMealPeriod: MealPeriod | undefined,
+  slot: MealPeriodSlot
+): ProductOption | null {
+  const choices = option.choices.filter((c) =>
+    choiceMatchesMealSlot(c, productMealPeriod, slot)
+  );
+  if (choices.length === 0) return null;
+  return { ...option, choices };
+}
+
+export default function MenuSelector({
+  product,
+  mealPeriodSlot,
+  onClose,
+  onAdd,
+}: MenuSelectorProps) {
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [selectedCurryIds, setSelectedCurryIds] = useState<string[]>([]);
+  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
   const [withRiceMenu, setWithRiceMenu] = useState<Product[]>([]);
+  const [extraMenu, setExtraMenu] = useState<Product[]>([]);
   const [withRiceLoading, setWithRiceLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
   const isRiceCurry = product?.category === RICE_CURRY_CATEGORY;
+  const productMealPeriod = product?.mealPeriod;
 
   const currentProductId = product?._id;
-  const [lastResetKey, setLastResetKey] = useState(currentProductId || '');
-  if (currentProductId && currentProductId !== lastResetKey) {
-    setLastResetKey(currentProductId);
+  const resetKey = `${currentProductId || ''}-${mealPeriodSlot}`;
+  const [lastResetKey, setLastResetKey] = useState(resetKey);
+  if (resetKey !== lastResetKey) {
+    setLastResetKey(resetKey);
     setSelected({});
     setSelectedCurryIds([]);
+    setSelectedExtraIds([]);
     setQuantity(1);
   }
 
@@ -48,19 +78,34 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
       return;
     }
     setWithRiceLoading(true);
-    fetch(`/api/products?category=${WITH_RICE_CATEGORY}`)
+    fetch(`/api/products?category=${WITH_RICE_CATEGORY}&mealPeriod=${mealPeriodSlot}`)
       .then((res) => res.json())
       .then((data) => {
         setWithRiceMenu((data.products || []).filter((p: Product) => p.isAvailable));
       })
       .catch(() => setWithRiceMenu([]))
       .finally(() => setWithRiceLoading(false));
-  }, [product, isRiceCurry, currentProductId]);
+  }, [product, isRiceCurry, currentProductId, mealPeriodSlot]);
+
+  useEffect(() => {
+    if (!product) {
+      setExtraMenu([]);
+      return;
+    }
+    fetch(`/api/products?category=${EXTRA_CATEGORY}&mealPeriod=${mealPeriodSlot}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setExtraMenu((data.products || []).filter((p: Product) => p.isAvailable));
+      })
+      .catch(() => setExtraMenu([]));
+  }, [product, currentProductId, mealPeriodSlot]);
 
   const countOption = useMemo(() => {
     if (!product || !isRiceCurry) return null;
-    return product.options.find((o) => o.name === CURRY_COUNT_OPTION_NAME) ?? null;
-  }, [product, isRiceCurry]);
+    const raw = product.options.find((o) => o.name === CURRY_COUNT_OPTION_NAME) ?? null;
+    if (!raw) return null;
+    return filterOptionForSlot(raw, productMealPeriod, mealPeriodSlot);
+  }, [product, isRiceCurry, productMealPeriod, mealPeriodSlot]);
 
   const countOptionKey = countOption ? countOption._id || countOption.name : '';
 
@@ -72,7 +117,6 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
     return choice ? parseCurrySlotCount(choice.label) : 0;
   }, [countOption, countOptionKey, selected]);
 
-  // เมื่อเปลี่ยนจำนวนแกง ตัดรายการแกงที่เลือกเกิน
   useEffect(() => {
     if (currySlots > 0 && selectedCurryIds.length > currySlots) {
       setSelectedCurryIds((prev) => prev.slice(0, currySlots));
@@ -81,24 +125,37 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
 
   const staticOptions = useMemo(() => {
     if (!product) return [];
-    if (!isRiceCurry) return product.options;
-    return product.options.filter((o) => o.name !== CURRY_COUNT_OPTION_NAME);
-  }, [product, isRiceCurry]);
+    const base = isRiceCurry
+      ? product.options.filter((o) => o.name !== CURRY_COUNT_OPTION_NAME)
+      : product.options;
+    return base
+      .map((o) => filterOptionForSlot(o, productMealPeriod, mealPeriodSlot))
+      .filter((o): o is ProductOption => o !== null);
+  }, [product, isRiceCurry, productMealPeriod, mealPeriodSlot]);
+
+  const extrasTotal = useMemo(() => {
+    return selectedExtraIds.reduce((sum, id) => {
+      const item = extraMenu.find((e) => e._id === id);
+      return sum + (item?.basePrice ?? 0);
+    }, 0);
+  }, [selectedExtraIds, extraMenu]);
 
   const totalPrice = useMemo(() => {
     if (!product) return 0;
     let adjustment = 0;
     product.options.forEach((option) => {
+      const filtered = filterOptionForSlot(option, productMealPeriod, mealPeriodSlot);
+      if (!filtered) return;
       const key = option._id || option.name;
       const chosenIds = selected[key] || [];
-      option.choices.forEach((choice) => {
+      filtered.choices.forEach((choice) => {
         if (chosenIds.includes(choice._id || choice.label)) {
           adjustment += choice.priceAdjustment;
         }
       });
     });
-    return (product.basePrice + adjustment) * quantity;
-  }, [product, selected, quantity]);
+    return (product.basePrice + adjustment + extrasTotal) * quantity;
+  }, [product, selected, quantity, productMealPeriod, mealPeriodSlot, extrasTotal]);
 
   const curryPickerValid =
     !isRiceCurry || (currySlots > 0 && selectedCurryIds.length === currySlots && withRiceMenu.length > 0);
@@ -150,12 +207,20 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
     });
   };
 
+  const toggleExtra = (extraId: string) => {
+    setSelectedExtraIds((prev) =>
+      prev.includes(extraId) ? prev.filter((id) => id !== extraId) : [...prev, extraId]
+    );
+  };
+
   const handleAdd = () => {
     const selectedChoices: OrderItem['selectedChoices'] = [];
     product.options.forEach((option) => {
+      const filtered = filterOptionForSlot(option, productMealPeriod, mealPeriodSlot);
+      if (!filtered) return;
       const key = option._id || option.name;
       const chosenIds = selected[key] || [];
-      const choiceLabels = option.choices
+      const choiceLabels = filtered.choices
         .filter((c) => chosenIds.includes(c._id || c.label))
         .map((c) => c.label);
       if (choiceLabels.length > 0) {
@@ -173,6 +238,16 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
       });
     }
 
+    if (selectedExtraIds.length > 0) {
+      const labels = selectedExtraIds
+        .map((id) => extraMenu.find((e) => e._id === id)?.name)
+        .filter(Boolean) as string[];
+      selectedChoices.push({
+        optionName: EXTRA_PICKER_OPTION_NAME,
+        choiceLabels: labels,
+      });
+    }
+
     onAdd({
       product: product._id,
       productName: product.name,
@@ -184,6 +259,7 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
 
     setSelected({});
     setSelectedCurryIds([]);
+    setSelectedExtraIds([]);
     setQuantity(1);
     onClose();
   };
@@ -256,7 +332,7 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
               {withRiceLoading && <p className="text-sm text-muted">กำลังโหลดเมนูกับข้าว...</p>}
               {!withRiceLoading && withRiceMenu.length === 0 && (
                 <p className="rounded-xl border border-dashed border-border p-3 text-sm text-muted">
-                  ยังไม่มีเมนูกับข้าว — แอดมินเพิ่มเมนูหมวด「กับข้าว」ก่อน
+                  ไม่มีกับข้าวในช่วงมื้อนี้ — แอดมินตรวจสอบช่วงขายหรือเพิ่มเมนูหมวด「กับข้าว」
                 </p>
               )}
               <div className="space-y-2">
@@ -285,6 +361,39 @@ export default function MenuSelector({ product, onClose, onAdd }: MenuSelectorPr
           )}
 
           {staticOptions.map((option) => renderOptionBlock(option))}
+
+          {extraMenu.length > 0 && (
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="font-medium text-navy">{EXTRA_PICKER_OPTION_NAME}</span>
+                <span className="text-xs text-muted">(เลือกได้หลายรายการ)</span>
+              </div>
+              <div className="space-y-2">
+                {extraMenu.map((item) => {
+                  const isSelected = selectedExtraIds.includes(item._id);
+                  return (
+                    <label
+                      key={item._id}
+                      className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 transition-colors ${
+                        isSelected ? 'border-accent bg-accent-soft' : 'border-border hover:bg-surface'
+                      }`}
+                    >
+                      <span className="text-navy">{item.name}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted">+{formatPrice(item.basePrice)}</span>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleExtra(item._id)}
+                          className="h-5 w-5 accent-accent"
+                        />
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div>
             <span className="font-medium text-navy">จำนวน</span>

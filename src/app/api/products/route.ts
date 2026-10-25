@@ -12,7 +12,15 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
     const category = req.nextUrl.searchParams.get('category');
-    const filter = category ? { category } : {};
+    const mealPeriod = req.nextUrl.searchParams.get('mealPeriod');
+    const filter: Record<string, unknown> = category ? { category } : {};
+    if (mealPeriod === 'morning' || mealPeriod === 'lunch') {
+      filter.$or = [
+        { mealPeriod: mealPeriod },
+        { mealPeriod: 'both' },
+        { mealPeriod: { $exists: false } },
+      ];
+    }
     const products = await Product.find(filter).sort({ category: 1, createdAt: -1 });
     return NextResponse.json({ products });
   } catch (error) {
@@ -38,6 +46,7 @@ export async function POST(req: NextRequest) {
       basePrice,
       image: body.image,
       category: body.category,
+      mealPeriod: body.mealPeriod || 'both',
       isAvailable: body.isAvailable !== false,
       options: Array.isArray(body.options) ? body.options : [],
     });

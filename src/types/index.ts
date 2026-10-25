@@ -12,6 +12,9 @@ export interface GeoLocation {
   address?: string;
 }
 
+/** ช่วงที่ขายเมนูหรือตัวเลือก */
+export type MealPeriod = 'morning' | 'lunch' | 'both';
+
 /**
  * ตัวเลือกของสินค้า (เช่น เลือกแกง 1 อย่าง/2 อย่าง, เลือกเผ็ด-ไม่เผ็ด)
  */
@@ -27,6 +30,8 @@ export interface OptionChoice {
   _id?: string;
   label: string;             // ชื่อที่แสดง เช่น "1 อย่าง", "2 อย่าง"
   priceAdjustment: number;   // บวก/ลบราคาเพิ่ม
+  /** ช่วงขายของตัวเลือกย่อย (ถ้าไม่ระบุ ใช้ mealPeriod ของเมนู) */
+  mealPeriod?: MealPeriod;
 }
 
 /**
@@ -38,7 +43,9 @@ export interface Product {
   description?: string;
   basePrice: number;         // ราคาฐาน
   image?: string;
-  category: 'rice-curry' | 'side-dish' | 'other';
+  category: 'rice-curry' | 'side-dish' | 'extra' | 'other';
+  /** ช่วงขายของเมนู (กับข้าว / เพิ่มเติม / อื่น ๆ) */
+  mealPeriod?: MealPeriod;
   isAvailable: boolean;
   options: ProductOption[];
   createdAt?: string;

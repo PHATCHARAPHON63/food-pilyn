@@ -7,7 +7,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, ChefHat, UtensilsCrossed } from 'lucide-react';
+import { ShoppingCart, ChefHat, UtensilsCrossed, PlusCircle, Sun, Coffee } from 'lucide-react';
+import {
+  detectMealPeriodSlot,
+  productMatchesMealSlot,
+  MEAL_SLOT_LABELS,
+  type MealPeriodSlot,
+} from '@/lib/meal-period';
 import MenuCard from '@/components/menu/MenuCard';
 import MenuSelector from '@/components/menu/MenuSelector';
 import Button from '@/components/ui/Button';
@@ -17,14 +23,18 @@ import type { Product, OrderItem } from '@/types';
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'rice-curry': <ChefHat className="h-4 w-4" />,
   'side-dish': <UtensilsCrossed className="h-4 w-4" />,
+  extra: <PlusCircle className="h-4 w-4" />,
   other: <ShoppingCart className="h-4 w-4" />,
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
   'rice-curry': 'ข้าวราดแกง',
   'side-dish': 'กับข้าว',
+  extra: 'เพิ่มเติม',
   other: 'เมนูแนะนำ',
 };
+
+const CATEGORY_ORDER = ['rice-curry', 'side-dish', 'extra', 'other'] as const;
 
 export default function MenuPage() {
   const router = useRouter();
@@ -34,6 +44,7 @@ export default function MenuPage() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [cartReady, setCartReady] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [mealSlot, setMealSlot] = useState<MealPeriodSlot>(() => detectMealPeriodSlot());
 
   useEffect(() => {
     try {
@@ -84,14 +95,21 @@ export default function MenuPage() {
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
 
   const groupedProducts = useMemo(() => {
-    return products.reduce<Record<string, Product[]>>((acc, product) => {
-      if ((product.category as string) === 'drink') return acc;
+    const acc: Record<string, Product[]> = {};
+    for (const product of products) {
+      if ((product.category as string) === 'drink') continue;
+      if (!productMatchesMealSlot(product, mealSlot)) continue;
       const key = product.category;
       if (!acc[key]) acc[key] = [];
       acc[key].push(product);
-      return acc;
-    }, {});
-  }, [products]);
+    }
+    return acc;
+  }, [products, mealSlot]);
+
+  const orderedCategories = useMemo(
+    () => CATEGORY_ORDER.filter((cat) => (groupedProducts[cat]?.length ?? 0) > 0),
+    [groupedProducts]
+  );
 
   const goToCheckout = () => {
     if (cart.length === 0) return;
@@ -117,11 +135,34 @@ export default function MenuPage() {
         <div className="mb-2 hidden h-1 w-12 rounded-full bg-accent sm:block" />
         <h2 className="text-lg font-bold sm:text-xl">สั่งอาหารวันนี้</h2>
         <p className="text-xs text-white/80 sm:text-sm">เลือกเมนูโปรดและปักหมุดจุดรับอาหารของคุณ</p>
+        <div className="mt-3 flex gap-2">
+          {(
+            [
+              { id: 'morning' as const, icon: Coffee },
+              { id: 'lunch' as const, icon: Sun },
+            ] as const
+          ).map(({ id, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setMealSlot(id)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${
+                mealSlot === id
+                  ? 'bg-accent text-navy'
+                  : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {MEAL_SLOT_LABELS[id]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* รายการเมนูแยกตามหมวดหมู่ */}
       <div className="space-y-6">
-        {Object.entries(groupedProducts).map(([category, items]) => {
+        {orderedCategories.map((category) => {
+          const items = groupedProducts[category] || [];
           const available = items.filter((p) => p.isAvailable);
           if (available.length === 0) return null;
           return (
@@ -162,6 +203,7 @@ export default function MenuPage() {
 
       <MenuSelector
         product={selectedProduct}
+        mealPeriodSlot={mealSlot}
         onClose={() => setSelectedProduct(null)}
         onAdd={addToCart}
       />
