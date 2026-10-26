@@ -15,9 +15,11 @@ import type { Product } from '@/types';
 interface MenuCardProps {
   product: Product;
   onSelect: (product: Product) => void;
+  /** ปิดปุ่มเลือกเมื่อยังไม่เปิดรับออเดอร์ (เมนูยังแสดงอยู่) */
+  canOrder?: boolean;
 }
 
-export default function MenuCard({ product, onSelect }: MenuCardProps) {
+export default function MenuCard({ product, onSelect, canOrder = true }: MenuCardProps) {
   const colorStyle = menuColorCardStyle(product.color);
 
   return (
@@ -32,9 +34,15 @@ export default function MenuCard({ product, onSelect }: MenuCardProps) {
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
         <span className="whitespace-nowrap font-semibold text-navy">{formatPrice(product.basePrice)}</span>
-        <Button onClick={() => onSelect(product)} variant="primary" size="sm">
+        <Button
+          onClick={() => onSelect(product)}
+          variant="primary"
+          size="sm"
+          disabled={!canOrder}
+          title={canOrder ? undefined : 'ยังไม่เปิดรับออเดอร์ในรอบนี้'}
+        >
           <Plus className="mr-1 h-4 w-4" />
-          เลือก
+          {canOrder ? 'เลือก' : 'ปิดรับ'}
         </Button>
       </div>
     </Card>
