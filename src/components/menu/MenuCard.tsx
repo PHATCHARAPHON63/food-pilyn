@@ -7,6 +7,7 @@
 import { Plus } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import ProductMenuImage from '@/components/menu/ProductMenuImage';
 import { formatPrice } from '@/lib/utils';
 import type { Product } from '@/types';
 
@@ -17,8 +18,9 @@ interface MenuCardProps {
 
 export default function MenuCard({ product, onSelect }: MenuCardProps) {
   return (
-    <Card className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
+    <Card className="flex items-start gap-3">
+      <ProductMenuImage src={product.image} alt={product.name} className="h-20 w-20 sm:h-24 sm:w-24" />
+      <div className="min-w-0 flex-1">
         <h3 className="font-semibold text-navy">{product.name}</h3>
         {product.description && <p className="text-sm text-muted">{product.description}</p>}
         {product.options.length > 0 && (

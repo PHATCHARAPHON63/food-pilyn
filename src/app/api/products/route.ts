@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Product from '@/models/Product';
 import { requireAdmin } from '@/lib/auth';
+import { sanitizeProductImageUrl } from '@/lib/product-image';
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       name,
       description: body.description,
       basePrice,
-      image: body.image,
+      image: sanitizeProductImageUrl(body.image),
       category: body.category,
       mealPeriod: body.mealPeriod || 'both',
       isAvailable: body.isAvailable !== false,

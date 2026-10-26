@@ -4,10 +4,12 @@
 // ============================================
 import { Schema, model, models } from 'mongoose';
 import type { GeoLocation } from '@/types';
+import type { MealOrderingSchedule } from '@/lib/meal-ordering-schedule';
 
 export interface StoreSettings {
   key: string;
   location?: GeoLocation;
+  mealOrderingSchedule?: MealOrderingSchedule;
 }
 
 const SettingsSchema = new Schema<StoreSettings>(
@@ -17,6 +19,18 @@ const SettingsSchema = new Schema<StoreSettings>(
       lat: { type: Number },
       lng: { type: Number },
       address: { type: String },
+    },
+    mealOrderingSchedule: {
+      morning: {
+        enabled: { type: Boolean },
+        open: { type: String },
+        close: { type: String },
+      },
+      lunch: {
+        enabled: { type: Boolean },
+        open: { type: String },
+        close: { type: String },
+      },
     },
   },
   { timestamps: true }

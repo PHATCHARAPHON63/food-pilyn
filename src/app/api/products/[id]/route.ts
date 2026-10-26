@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Product from '@/models/Product';
 import { requireAdmin } from '@/lib/auth';
+import { sanitizeProductImageUrl } from '@/lib/product-image';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -44,7 +45,16 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       'options',
     ] as const;
     for (const key of allowed) {
-      if (key in body) update[key] = body[key];
+      if (!(key in body)) continue;
+      if (key === 'image') {
+        if (body.image === null || body.image === '') {
+          update[key] = null;
+        } else {
+          update[key] = sanitizeProductImageUrl(body.image);
+        }
+      } else {
+        update[key] = body[key];
+      }
     }
 
     await connectDB();

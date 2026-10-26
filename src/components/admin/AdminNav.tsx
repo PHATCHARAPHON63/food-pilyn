@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, UtensilsCrossed, ClipboardList, Map, LogOut } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, ClipboardList, Map, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AdminNavProps {
@@ -25,6 +25,7 @@ const navItems = [
   { href: '/admin/orders', label: 'ออเดอร์', icon: ClipboardList },
   { href: '/admin/menu', label: 'เมนู', icon: UtensilsCrossed },
   { href: '/admin/delivery', label: 'จัดส่ง', icon: Map },
+  { href: '/admin/settings', label: 'ตั้งค่า', icon: Settings },
 ];
 
 export default function AdminNav({ username, role }: AdminNavProps) {

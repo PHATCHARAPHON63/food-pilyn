@@ -15,6 +15,7 @@ import Card from '@/components/ui/Card';
 import GoogleMapPicker from '@/components/map/GoogleMapPicker';
 import { formatPrice, generateOrderNumber, isValidOrderNumber, sanitizeCartItems } from '@/lib/utils';
 import type { CashTenderType, OrderItem, GeoLocation, PaymentMethod } from '@/types';
+import type { MealPeriodSlot } from '@/lib/meal-period';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function CheckoutPage() {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [mealPeriodSlot, setMealPeriodSlot] = useState<MealPeriodSlot | null>(null);
 
   useEffect(() => {
     try {
@@ -47,6 +49,8 @@ export default function CheckoutPage() {
     const next = isValidOrderNumber(existing) ? existing : generateOrderNumber();
     sessionStorage.setItem('orderNumber', next);
     setOrderNumber(next);
+    const slot = sessionStorage.getItem('mealPeriodSlot');
+    if (slot === 'morning' || slot === 'lunch') setMealPeriodSlot(slot);
     setReady(true);
   }, []);
 
@@ -95,15 +99,26 @@ export default function CheckoutPage() {
 
   const submitOrder = async () => {
     if (!isValid) return;
+    if (!mealPeriodSlot) {
+      setError('รอบมื้อไม่ถูกต้อง กรุณากลับไปเลือกเมนูใหม่');
+      return;
+    }
     setSubmitting(true);
     setError('');
 
     try {
+      const statusRes = await fetch('/api/settings/meal-ordering');
+      const statusData = await statusRes.json();
+      if (!statusRes.ok || !statusData.open?.[mealPeriodSlot]) {
+        throw new Error('ขณะนี้ปิดรับออเดอร์รอบนี้แล้ว กรุณากลับไปเลือกเมนู');
+      }
+
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderNumber: orderNumber || generateOrderNumber(),
+          mealPeriodSlot,
           items: cart,
           customer: { name, phone },
           deliveryLocation: location,
@@ -121,6 +136,7 @@ export default function CheckoutPage() {
       // ล้างตะกร้าและแสดงหน้าสำเร็จ
       sessionStorage.removeItem('cart');
       sessionStorage.removeItem('orderNumber');
+      sessionStorage.removeItem('mealPeriodSlot');
       router.push(`/checkout/success?order=${data.order.orderNumber}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');

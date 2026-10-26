@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import ProductMenuImage from '@/components/menu/ProductMenuImage';
 import { formatPrice } from '@/lib/utils';
 import {
   choiceMatchesMealSlot,
@@ -307,10 +308,13 @@ export default function MenuSelector({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div className="w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-navy">{product.name}</h3>
-            {isRiceCurry && <p className="text-xs text-muted">เลือกจากเมนูกับข้าวที่จะราดลงบนข้าว</p>}
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 gap-3">
+            <ProductMenuImage src={product.image} alt={product.name} className="h-16 w-16" sizes="64px" />
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-navy">{product.name}</h3>
+              {isRiceCurry && <p className="text-xs text-muted">เลือกจากเมนูกับข้าวที่จะราดลงบนข้าว</p>}
+            </div>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-surface">
             <X className="h-5 w-5 text-muted" />

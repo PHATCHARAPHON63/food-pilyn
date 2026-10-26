@@ -20,6 +20,10 @@
 # production
 /build
 
+# uploaded menu images (keep folder via .gitkeep)
+/public/uploads/products/*
+!/public/uploads/products/.gitkeep
+
 # misc
 .DS_Store
 *.pem

@@ -3,6 +3,7 @@
 // ============================================
 
 import type { MealPeriod } from '@/types';
+import { getBangkokHour } from '@/lib/meal-ordering-schedule';
 
 export type MealPeriodSlot = 'morning' | 'lunch';
 
@@ -17,9 +18,9 @@ export const MEAL_SLOT_LABELS: Record<MealPeriodSlot, string> = {
   lunch: 'มื้อกลางวัน',
 };
 
-/** กำหนดมื้อจากเวลาปัจจุบัน (ก่อน 11:00 = เช้า) */
+/** กำหนดมื้อจากเวลาปัจจุบัน (เวลาไทย, ก่อน 11:00 = เช้า) */
 export function detectMealPeriodSlot(date = new Date()): MealPeriodSlot {
-  return date.getHours() < 11 ? 'morning' : 'lunch';
+  return getBangkokHour(date) < 11 ? 'morning' : 'lunch';
 }
 
 export function normalizeMealPeriod(value: unknown): MealPeriod {

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Plus, Trash2, Edit3 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import ProductMenuImage from '@/components/menu/ProductMenuImage';
 import { formatPrice } from '@/lib/utils';
 import type { Product } from '@/types';
 import { MEAL_PERIOD_LABELS, normalizeMealPeriod } from '@/lib/meal-period';
@@ -84,13 +85,16 @@ export default function AdminMenuPage() {
       <div className="grid gap-3">
         {products.map((product) => (
           <Card key={product._id} className="flex items-center justify-between gap-3">
-            <div>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProductMenuImage src={product.image} alt={product.name} className="h-14 w-14" sizes="56px" />
+              <div className="min-w-0">
               <p className="font-semibold text-navy">{product.name}</p>
               <p className="text-sm text-muted">
                 {CATEGORY_LABELS[product.category]} · {formatPrice(product.basePrice)} ·{' '}
                 {MEAL_PERIOD_LABELS[normalizeMealPeriod(product.mealPeriod)]}
                 {product.category === 'rice-curry' && ` · ${product.options.length} ตัวเลือก`}
               </p>
+              </div>
             </div>
             <div className="flex gap-2">
               <Link

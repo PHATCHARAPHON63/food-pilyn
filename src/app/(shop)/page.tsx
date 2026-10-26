@@ -9,11 +9,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShoppingCart, ChefHat, UtensilsCrossed, PlusCircle, Sun, Coffee } from 'lucide-react';
 import {
-  detectMealPeriodSlot,
   productMatchesMealSlot,
   MEAL_SLOT_LABELS,
   type MealPeriodSlot,
 } from '@/lib/meal-period';
+import {
+  pickDefaultMealSlot,
+  formatSlotWindow,
+  THAILAND_TIMEZONE,
+  type MealOrderingStatus,
+} from '@/lib/meal-ordering-schedule';
 import MenuCard from '@/components/menu/MenuCard';
 import MenuSelector from '@/components/menu/MenuSelector';
 import Button from '@/components/ui/Button';
@@ -44,7 +49,8 @@ export default function MenuPage() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [cartReady, setCartReady] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [mealSlot, setMealSlot] = useState<MealPeriodSlot>(() => detectMealPeriodSlot());
+  const [mealOrdering, setMealOrdering] = useState<MealOrderingStatus | null>(null);
+  const [mealSlot, setMealSlot] = useState<MealPeriodSlot>('morning');
 
   useEffect(() => {
     try {
@@ -65,6 +71,32 @@ export default function MenuPage() {
       sessionStorage.removeItem('cart');
     }
   }, [cart, cartReady]);
+
+  useEffect(() => {
+    const refreshOrdering = () =>
+      fetch('/api/settings/meal-ordering')
+        .then((res) => res.json())
+        .then((data: MealOrderingStatus) => {
+          if (!data?.schedule) return;
+          setMealOrdering(data);
+          setMealSlot((prev) => {
+            if (data.open[prev]) return prev;
+            const picked = pickDefaultMealSlot(data.schedule);
+            return picked ?? prev;
+          });
+        })
+        .catch(() => {});
+
+    void refreshOrdering();
+    const timer = window.setInterval(refreshOrdering, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (mealOrdering?.open[mealSlot]) {
+      sessionStorage.setItem('mealPeriodSlot', mealSlot);
+    }
+  }, [mealSlot, mealOrdering]);
 
   useEffect(() => {
     fetch('/api/products')
@@ -111,9 +143,15 @@ export default function MenuPage() {
     [groupedProducts]
   );
 
+  const slotOpen = mealOrdering?.open[mealSlot] ?? true;
+  const anySlotOpen = mealOrdering
+    ? mealOrdering.open.morning || mealOrdering.open.lunch
+    : true;
+
   const goToCheckout = () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || !slotOpen) return;
     sessionStorage.setItem('cart', JSON.stringify(cart));
+    sessionStorage.setItem('mealPeriodSlot', mealSlot);
     if (!isValidOrderNumber(sessionStorage.getItem('orderNumber'))) {
       sessionStorage.setItem('orderNumber', generateOrderNumber());
     }
@@ -135,33 +173,66 @@ export default function MenuPage() {
         <div className="mb-2 hidden h-1 w-12 rounded-full bg-accent sm:block" />
         <h2 className="text-lg font-bold sm:text-xl">สั่งอาหารวันนี้</h2>
         <p className="text-xs text-white/80 sm:text-sm">เลือกเมนูโปรดและปักหมุดจุดรับอาหารของคุณ</p>
-        <div className="mt-3 flex gap-2">
+        {mealOrdering && (
+          <p className="mt-1 text-[11px] text-white/70 sm:text-xs">
+            เวลาไทย {mealOrdering.bangkokTime} ({THAILAND_TIMEZONE})
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
           {(
             [
               { id: 'morning' as const, icon: Coffee },
               { id: 'lunch' as const, icon: Sun },
             ] as const
-          ).map(({ id, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setMealSlot(id)}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${
-                mealSlot === id
-                  ? 'bg-accent text-navy'
-                  : 'bg-white/15 text-white hover:bg-white/25'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {MEAL_SLOT_LABELS[id]}
-            </button>
-          ))}
+          ).map(({ id, icon: Icon }) => {
+            const open = mealOrdering?.open[id] ?? true;
+            const windowLabel = mealOrdering
+              ? formatSlotWindow(mealOrdering.schedule[id])
+              : '';
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={!open}
+                onClick={() => open && setMealSlot(id)}
+                title={
+                  open
+                    ? windowLabel
+                      ? `รับออเดอร์ ${windowLabel}`
+                      : undefined
+                    : `ปิดรับออเดอร์${windowLabel ? ` (${windowLabel})` : ''}`
+                }
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${
+                  mealSlot === id
+                    ? 'bg-accent text-navy'
+                    : open
+                      ? 'bg-white/15 text-white hover:bg-white/25'
+                      : 'cursor-not-allowed bg-white/10 text-white/40'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {MEAL_SLOT_LABELS[id]}
+              </button>
+            );
+          })}
         </div>
+        {mealOrdering && !anySlotOpen && (
+          <p className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-xs text-white/90">
+            ขณะนี้ปิดรับออเดอร์ทุกรอบ — เช้า {formatSlotWindow(mealOrdering.schedule.morning)} · กลางวัน{' '}
+            {formatSlotWindow(mealOrdering.schedule.lunch)}
+          </p>
+        )}
+        {mealOrdering && anySlotOpen && !slotOpen && (
+          <p className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-xs text-white/90">
+            รอบ{MEAL_SLOT_LABELS[mealSlot]}ปิดรับออเดอร์แล้ว ({formatSlotWindow(mealOrdering.schedule[mealSlot])})
+          </p>
+        )}
       </div>
 
       {/* รายการเมนูแยกตามหมวดหมู่ */}
       <div className="space-y-6">
-        {orderedCategories.map((category) => {
+        {slotOpen &&
+        orderedCategories.map((category) => {
           const items = groupedProducts[category] || [];
           const available = items.filter((p) => p.isAvailable);
           if (available.length === 0) return null;
@@ -182,7 +253,10 @@ export default function MenuPage() {
       </div>
 
       {loadError && <div className="py-12 text-center text-red-600">{loadError}</div>}
-      {!loadError && products.length === 0 && (
+      {!loadError && !anySlotOpen && mealOrdering && (
+        <div className="py-12 text-center text-muted">ยังไม่เปิดรับออเดอร์ในเวลานี้ กรุณากลับมาใหม่ตามเวลาที่กำหนด</div>
+      )}
+      {!loadError && anySlotOpen && products.length === 0 && (
         <div className="py-12 text-center text-muted">ยังไม่มีเมนูในระบบ</div>
       )}
 
@@ -194,7 +268,7 @@ export default function MenuPage() {
               <p className="text-xs text-muted">{cart.reduce((sum, i) => sum + i.quantity, 0)} รายการ</p>
               <p className="text-base font-bold text-navy sm:text-lg">{formatPrice(total)}</p>
             </div>
-            <Button onClick={goToCheckout} size="md" variant="secondary">
+            <Button onClick={goToCheckout} size="md" variant="secondary" disabled={!slotOpen}>
               สั่งอาหาร
             </Button>
           </div>

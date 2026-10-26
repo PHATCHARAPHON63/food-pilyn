@@ -4,6 +4,12 @@ const mapsKey =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
+    ],
+  },
   env: {
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: mapsKey,
     NEXT_PUBLIC_STORE_LAT: process.env.NEXT_PUBLIC_STORE_LAT || process.env.STORE_LAT || '13.7563',

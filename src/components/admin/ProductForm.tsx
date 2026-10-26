@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import type { Product, ProductOption, OptionChoice, MealPeriod } from '@/types';
 import { MEAL_PERIOD_LABELS } from '@/lib/meal-period';
+import ProductImageField from '@/components/admin/ProductImageField';
 
 function createEmptyOption(): ProductOption {
   return {
@@ -51,7 +52,7 @@ export default function ProductForm({ initial, title }: ProductFormProps) {
       name: editing.name.trim(),
       description: editing.description,
       basePrice: editing.basePrice,
-      image: editing.image,
+      image: editing.image?.trim() ? editing.image.trim() : null,
       category: editing.category,
       mealPeriod: editing.mealPeriod || 'both',
       isAvailable: editing.isAvailable,
@@ -188,6 +189,12 @@ export default function ProductForm({ initial, title }: ProductFormProps) {
             onChange={(e) => setEditing({ ...editing, description: e.target.value })}
           />
         </div>
+
+        <ProductImageField
+          value={editing.image}
+          productName={editing.name}
+          onChange={(url) => setEditing({ ...editing, image: url })}
+        />
 
         <div className="flex items-center gap-2">
           <input

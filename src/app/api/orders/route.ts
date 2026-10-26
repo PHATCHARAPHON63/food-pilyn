@@ -6,8 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Order from '@/models/Order';
+import Product from '@/models/Product';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { generateOrderNumber, isMongoId, isValidOrderNumber } from '@/lib/utils';
+import { productMatchesMealSlot, type MealPeriodSlot } from '@/lib/meal-period';
+import { isMealSlotOpen } from '@/lib/meal-ordering-schedule';
+import { loadMealOrderingSchedule } from '@/lib/meal-ordering-schedule.server';
 
 function sanitizeItems(raw: unknown) {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -84,6 +88,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'รายการอาหารไม่ถูกต้อง กรุณาเลือกเมนูใหม่' }, { status: 400 });
     }
 
+    const mealPeriodSlot = body.mealPeriodSlot;
+    if (mealPeriodSlot !== 'morning' && mealPeriodSlot !== 'lunch') {
+      return NextResponse.json({ error: 'กรุณาเลือกรอบมื้อก่อนสั่งอาหาร' }, { status: 400 });
+    }
+    const slot: MealPeriodSlot = mealPeriodSlot;
+
+    const schedule = await loadMealOrderingSchedule();
+    if (!isMealSlotOpen(schedule, slot)) {
+      return NextResponse.json({ error: 'ขณะนี้ปิดรับออเดอร์รอบนี้แล้ว' }, { status: 403 });
+    }
+
     const name = String(body.customer?.name || '').trim();
     const phone = String(body.customer?.phone || '').trim();
     if (!name || !phone) {
@@ -121,6 +136,20 @@ export async function POST(req: NextRequest) {
       : generateOrderNumber();
 
     await connectDB();
+
+    const productIds = [...new Set(items.map((item) => item.product))];
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map((p) => [String(p._id), p]));
+    for (const item of items) {
+      const product = productMap.get(item.product);
+      if (!product || !product.isAvailable) {
+        return NextResponse.json({ error: 'มีเมนูที่ไม่พร้อมขาย กรุณาเลือกเมนูใหม่' }, { status: 400 });
+      }
+      if (!productMatchesMealSlot(product, slot)) {
+        return NextResponse.json({ error: 'เมนูไม่ตรงกับรอบมื้อที่เลือก' }, { status: 400 });
+      }
+    }
+
     const order = await Order.create({
       orderNumber,
       items,
