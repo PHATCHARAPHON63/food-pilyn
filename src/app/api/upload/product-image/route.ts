@@ -7,8 +7,12 @@ import { requireAdmin } from '@/lib/auth';
 import { uploadMenuImage } from '@/lib/cloudinary.server';
 import {
   ALLOWED_PRODUCT_IMAGE_TYPES,
-  MAX_PRODUCT_IMAGE_BYTES,
 } from '@/lib/product-image';
+import {
+  MAX_MENU_IMAGE_UPLOAD_BYTES,
+  MenuImageTooLargeError,
+  optimizeMenuImageForUpload,
+} from '@/lib/optimize-menu-image.server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,17 +32,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
-      return NextResponse.json({ error: 'ขนาดรูปต้องไม่เกิน 2 MB' }, { status: 400 });
+    if (file.size > MAX_MENU_IMAGE_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: 'ไฟล์ต้นทางใหญ่เกินไป (สูงสุด 12 MB) — ระบบจะย่อให้อัตโนมัติ' },
+        { status: 400 }
+      );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const raw = Buffer.from(await file.arrayBuffer());
+    const buffer = await optimizeMenuImageForUpload(raw, file.type);
     const url = await uploadMenuImage(buffer);
 
     return NextResponse.json({ url });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 401 });
+    }
+    if (error instanceof MenuImageTooLargeError) {
+      return NextResponse.json(
+        { error: 'ย่อรูปแล้วยังใหญ่เกิน 2 MB กรุณาใช้รูปที่เล็กลงหรือครอปก่อนอัปโหลด' },
+        { status: 400 }
+      );
     }
     console.error('POST product-image upload error:', error);
     return NextResponse.json({ error: 'อัปโหลดรูปไม่สำเร็จ' }, { status: 500 });

@@ -13,6 +13,7 @@ import ProductMenuImage from '@/components/menu/ProductMenuImage';
 import { formatPrice } from '@/lib/utils';
 import type { Product } from '@/types';
 import { MEAL_PERIOD_LABELS, normalizeMealPeriod } from '@/lib/meal-period';
+import { menuColorCardStyle } from '@/lib/menu-color';
 
 const CATEGORY_LABELS: Record<Product['category'], string> = {
   'rice-curry': 'ข้าวราดแกง',
@@ -84,7 +85,11 @@ export default function AdminMenuPage() {
 
       <div className="grid gap-3">
         {products.map((product) => (
-          <Card key={product._id} className="flex items-center justify-between gap-3">
+          <Card
+            key={product._id}
+            className="flex items-center justify-between gap-3 overflow-hidden"
+            style={menuColorCardStyle(product.color)}
+          >
             <div className="flex min-w-0 items-center gap-3">
               <ProductMenuImage src={product.image} alt={product.name} className="h-14 w-14" sizes="56px" />
               <div className="min-w-0">

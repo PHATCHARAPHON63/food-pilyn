@@ -8,7 +8,10 @@ import { ImagePlus, Link2, Trash2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import ProductMenuImage from '@/components/menu/ProductMenuImage';
-import { MAX_PRODUCT_IMAGE_BYTES, sanitizeProductImageUrl } from '@/lib/product-image';
+import { sanitizeProductImageUrl } from '@/lib/product-image';
+
+/** จำกัดที่ client เพื่อไม่ส่งไฟล์ใหญ่เกินไป (เซิร์ฟเวอร์รับสูงสุด 12 MB แล้วย่อให้ ≤ 2 MB) */
+const MAX_PICK_BYTES = 12 * 1024 * 1024;
 
 interface ProductImageFieldProps {
   value?: string;
@@ -24,8 +27,8 @@ export default function ProductImageField({ value, productName, onChange }: Prod
 
   const uploadFile = async (file: File) => {
     setUploadError('');
-    if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
-      setUploadError('ขนาดรูปต้องไม่เกิน 2 MB');
+    if (file.size > MAX_PICK_BYTES) {
+      setUploadError('ไฟล์ใหญ่เกิน 12 MB กรุณาเลือกรูปที่เล็กลง');
       return;
     }
     setUploading(true);
@@ -99,7 +102,7 @@ export default function ProductImageField({ value, productName, onChange }: Prod
             )}
           </div>
           <p className="text-xs text-muted">
-            อัปโหลดจะเก็บที่ Cloudinary · JPG, PNG, WebP หรือ GIF สูงสุด 2 MB
+            อัปโหลด Cloudinary · รับ JPG/PNG/WebP/GIF สูงสุด 12 MB ระบบย่อและบีบอัดให้ไม่เกิน 2 MB อัตโนมัติ
           </p>
 
           <div className="flex flex-col gap-2 sm:flex-row">

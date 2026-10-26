@@ -8,6 +8,7 @@ import connectDB from '@/lib/db';
 import Product from '@/models/Product';
 import { requireAdmin } from '@/lib/auth';
 import { sanitizeProductImageUrl } from '@/lib/product-image';
+import { sanitizeMenuColor } from '@/lib/menu-color';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -39,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       'description',
       'basePrice',
       'image',
+      'color',
       'category',
       'mealPeriod',
       'isAvailable',
@@ -51,6 +53,12 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           update[key] = null;
         } else {
           update[key] = sanitizeProductImageUrl(body.image);
+        }
+      } else if (key === 'color') {
+        if (body.color === null || body.color === '') {
+          update[key] = null;
+        } else {
+          update[key] = sanitizeMenuColor(body.color);
         }
       } else {
         update[key] = body[key];

@@ -43,6 +43,8 @@ export interface Product {
   description?: string;
   basePrice: number;         // ราคาฐาน
   image?: string;
+  /** สีประจำเมนู (hex เช่น #c9a227) */
+  color?: string;
   category: 'rice-curry' | 'side-dish' | 'extra' | 'other';
   /** ช่วงขายของเมนู (กับข้าว / เพิ่มเติม / อื่น ๆ) */
   mealPeriod?: MealPeriod;

@@ -30,6 +30,7 @@ const ProductSchema = new Schema<Product>(
     description: { type: String },
     basePrice: { type: Number, required: true, min: 0 },
     image: { type: String },
+    color: { type: String },
     category: {
       type: String,
       enum: ['rice-curry', 'side-dish', 'extra', 'other'],

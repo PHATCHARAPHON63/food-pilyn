@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import ProductMenuImage from '@/components/menu/ProductMenuImage';
+import { sanitizeMenuColor } from '@/lib/menu-color';
 import { formatPrice } from '@/lib/utils';
 import {
   choiceMatchesMealSlot,
@@ -305,9 +306,20 @@ export default function MenuSelector({
     </div>
   );
 
+  const accent = product ? sanitizeMenuColor(product.color) : undefined;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-      <div className="w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+      <div
+        className="w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl"
+        style={
+          accent
+            ? {
+                boxShadow: `0 -4px 0 0 ${accent}, 0 25px 50px -12px rgb(0 0 0 / 0.25)`,
+              }
+            : undefined
+        }
+      >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
             <ProductMenuImage src={product.image} alt={product.name} className="h-16 w-16" sizes="64px" />

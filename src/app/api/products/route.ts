@@ -8,6 +8,7 @@ import connectDB from '@/lib/db';
 import Product from '@/models/Product';
 import { requireAdmin } from '@/lib/auth';
 import { sanitizeProductImageUrl } from '@/lib/product-image';
+import { sanitizeMenuColor } from '@/lib/menu-color';
 
 export async function GET(req: NextRequest) {
   try {
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
       description: body.description,
       basePrice,
       image: sanitizeProductImageUrl(body.image),
+      color: sanitizeMenuColor(body.color),
       category: body.category,
       mealPeriod: body.mealPeriod || 'both',
       isAvailable: body.isAvailable !== false,
