@@ -81,6 +81,12 @@ NEXT_PUBLIC_STORE_LNG=100.5018
 
 > **หมายเหตุ:** `GOOGLE_MAPS_API_KEY` ใช้ฝั่ง Server (ถ้ามี) และ `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` ใช้ฝั่ง Client สำหรับโหลดแผนที่
 
+### แจ้งเตือนออเดอร์ใหม่ทางอีเมล
+
+SMTP Office 365 ตั้งใน `src/lib/mailer.server.ts` (แก้ `DEFAULT_APP_URL` เป็นโดเมนจริงเมื่อ deploy)
+
+ในแอดมิน → **ตั้งค่า** → **แจ้งเตือนอีเมล** เปิดใช้และใส่อีเมลผู้รับ แล้วบันทึก
+
 ### 3. Seed ข้อมูลเริ่มต้น
 
 ```bash

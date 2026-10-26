@@ -5,11 +5,13 @@
 import { Schema, model, models } from 'mongoose';
 import type { GeoLocation } from '@/types';
 import type { MealOrderingSchedule } from '@/lib/meal-ordering-schedule';
+import type { OrderEmailNotifySettings } from '@/lib/order-email-notify';
 
 export interface StoreSettings {
   key: string;
   location?: GeoLocation;
   mealOrderingSchedule?: MealOrderingSchedule;
+  orderEmailNotify?: OrderEmailNotifySettings;
 }
 
 const SettingsSchema = new Schema<StoreSettings>(
@@ -31,6 +33,10 @@ const SettingsSchema = new Schema<StoreSettings>(
         open: { type: String },
         close: { type: String },
       },
+    },
+    orderEmailNotify: {
+      enabled: { type: Boolean, default: false },
+      recipients: [{ type: String }],
     },
   },
   { timestamps: true }

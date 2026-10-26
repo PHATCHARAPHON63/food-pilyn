@@ -11,6 +11,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { generateOrderNumber, isMongoId, isValidOrderNumber } from '@/lib/utils';
 import { productMatchesMealSlot, type MealPeriodSlot } from '@/lib/meal-period';
 import { ACTIVE_ORDER_FILTER } from '@/lib/order-query';
+import { notifyAdminsNewOrderEmail } from '@/lib/notify-new-order-email.server';
 
 function sanitizeItems(raw: unknown) {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -159,6 +160,18 @@ export async function POST(req: NextRequest) {
       totalAmount,
       note: typeof body.note === 'string' ? body.note.trim().slice(0, 300) : undefined,
       status: 'pending',
+    });
+
+    void notifyAdminsNewOrderEmail({
+      orderNumber: order.orderNumber,
+      customer: { name, phone },
+      items: items.map((item) => ({ productName: item.productName, quantity: item.quantity })),
+      totalAmount,
+      paymentMethod,
+      cashTenderType,
+      cashBanknote,
+      note: typeof body.note === 'string' ? body.note.trim().slice(0, 300) : undefined,
+      mealPeriodSlot: slot,
     });
 
     return NextResponse.json({ order }, { status: 201 });

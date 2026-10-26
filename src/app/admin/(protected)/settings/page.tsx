@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { Clock, Coffee, Sun } from 'lucide-react';
+import { Clock, Coffee, Mail, Sun } from 'lucide-react';
+import type { OrderEmailNotifySettings } from '@/lib/order-email-notify';
 import {
   DEFAULT_MEAL_ORDERING_SCHEDULE,
   THAILAND_TIMEZONE,
@@ -89,10 +90,18 @@ function SlotEditor({
 export default function AdminSettingsPage() {
   const [schedule, setSchedule] = useState<MealOrderingSchedule>(DEFAULT_MEAL_ORDERING_SCHEDULE);
   const [live, setLive] = useState<MealOrderingStatus | null>(null);
+  const [emailNotify, setEmailNotify] = useState<OrderEmailNotifySettings>({
+    enabled: false,
+    recipients: [],
+  });
+  const [recipientsText, setRecipientsText] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
   const [message, setMessage] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
   const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const load = () =>
     fetch('/api/settings/meal-ordering')
@@ -103,8 +112,18 @@ export default function AdminSettingsPage() {
         setLive(data);
       });
 
+  const loadEmail = () =>
+    fetch('/api/settings/order-email')
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'โหลดอีเมลไม่สำเร็จ');
+        const settings = data.settings as OrderEmailNotifySettings;
+        setEmailNotify(settings);
+        setRecipientsText(settings.recipients.join('\n'));
+      });
+
   useEffect(() => {
-    load()
+    Promise.all([load(), loadEmail()])
       .catch(() => setError('โหลดตั้งค่าไม่สำเร็จ'))
       .finally(() => setLoading(false));
   }, []);
@@ -115,6 +134,34 @@ export default function AdminSettingsPage() {
     }, 60_000);
     return () => window.clearInterval(id);
   }, []);
+
+  const saveEmail = async () => {
+    setSavingEmail(true);
+    setEmailMessage('');
+    setEmailError('');
+    const recipients = recipientsText
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    try {
+      const res = await fetch('/api/settings/order-email', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: { ...emailNotify, recipients },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ');
+      setEmailNotify(data.settings);
+      setRecipientsText(data.settings.recipients.join('\n'));
+      setEmailMessage('บันทึกการแจ้งเตือนอีเมลแล้ว');
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSavingEmail(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -178,7 +225,7 @@ export default function AdminSettingsPage() {
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={save} disabled={saving}>
-          {saving ? 'กำลังบันทึก…' : 'บันทึกการตั้งค่า'}
+          {saving ? 'กำลังบันทึก…' : 'บันทึกรอบมื้อ'}
         </Button>
         <Button
           type="button"
@@ -188,6 +235,40 @@ export default function AdminSettingsPage() {
           คืนค่าเริ่มต้น
         </Button>
       </div>
+
+      <Card className="space-y-4">
+        <div className="flex items-center gap-2 font-semibold text-navy">
+          <Mail className="h-5 w-5 text-accent" />
+          แจ้งเตือนออเดอร์ทางอีเมล
+        </div>
+        <p className="text-sm text-muted">
+          เมื่อมีออเดอร์ใหม่ ระบบจะส่งอีเมลจากบัญชีร้านไปยังรายชื่อด้านล่าง
+        </p>
+        {emailError && <p className="text-sm text-red-600">{emailError}</p>}
+        {emailMessage && <p className="text-sm text-green-700">{emailMessage}</p>}
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={emailNotify.enabled}
+            onChange={(e) => setEmailNotify((prev) => ({ ...prev, enabled: e.target.checked }))}
+            className="h-4 w-4 rounded border-border accent-accent"
+          />
+          เปิดแจ้งเตือนอีเมลเมื่อมีออเดอร์ใหม่
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-muted">อีเมลผู้รับ (หนึ่งบรรทัดต่อหนึ่งคน)</span>
+          <textarea
+            value={recipientsText}
+            onChange={(e) => setRecipientsText(e.target.value)}
+            rows={4}
+            placeholder={'admin@example.com\nkitchen@example.com'}
+            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-mono"
+          />
+        </label>
+        <Button onClick={saveEmail} disabled={savingEmail}>
+          {savingEmail ? 'กำลังบันทึก…' : 'บันทึกอีเมลแจ้งเตือน'}
+        </Button>
+      </Card>
     </div>
   );
 }
