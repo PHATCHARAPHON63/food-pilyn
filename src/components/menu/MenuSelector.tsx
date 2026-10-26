@@ -35,6 +35,14 @@ interface MenuSelectorProps {
   onAdd: (item: OrderItem) => void;
 }
 
+function optionKey(option: ProductOption): string {
+  return option._id != null ? String(option._id) : option.name;
+}
+
+function choiceKey(choice: OptionChoice): string {
+  return choice._id != null ? String(choice._id) : choice.label;
+}
+
 function filterOptionForSlot(
   option: ProductOption,
   productMealPeriod: MealPeriod | undefined,
@@ -105,17 +113,17 @@ export default function MenuSelector({
   const countOption = useMemo(() => {
     if (!product || !isRiceCurry) return null;
     const raw = product.options.find((o) => o.name === CURRY_COUNT_OPTION_NAME) ?? null;
-    if (!raw) return null;
-    return filterOptionForSlot(raw, productMealPeriod, mealPeriodSlot);
-  }, [product, isRiceCurry, productMealPeriod, mealPeriodSlot]);
+    if (!raw || raw.choices.length === 0) return null;
+    return raw;
+  }, [product, isRiceCurry]);
 
-  const countOptionKey = countOption ? countOption._id || countOption.name : '';
+  const countOptionKey = countOption ? optionKey(countOption) : '';
 
   const currySlots = useMemo(() => {
     if (!countOption || !countOptionKey) return 0;
     const chosenId = (selected[countOptionKey] || [])[0];
     if (!chosenId) return 0;
-    const choice = countOption.choices.find((c) => (c._id || c.label) === chosenId);
+    const choice = countOption.choices.find((c) => choiceKey(c) === chosenId);
     return choice ? parseCurrySlotCount(choice.label) : 0;
   }, [countOption, countOptionKey, selected]);
 
@@ -148,10 +156,10 @@ export default function MenuSelector({
     product.options.forEach((option) => {
       const filtered = filterOptionForSlot(option, productMealPeriod, mealPeriodSlot);
       if (!filtered) return;
-      const key = option._id || option.name;
+      const key = optionKey(option);
       const chosenIds = selected[key] || [];
       filtered.choices.forEach((choice) => {
-        if (chosenIds.includes(choice._id || choice.label)) {
+        if (chosenIds.includes(choiceKey(choice))) {
           adjustment += choice.priceAdjustment;
         }
       });
@@ -159,31 +167,37 @@ export default function MenuSelector({
     return (product.basePrice + adjustment + extrasTotal) * quantity;
   }, [product, selected, quantity, productMealPeriod, mealPeriodSlot, extrasTotal]);
 
-  const curryPickerValid =
-    !isRiceCurry || (currySlots > 0 && selectedCurryIds.length === currySlots && withRiceMenu.length > 0);
-
   const isValid = useMemo(() => {
     if (!product) return false;
-    if (isRiceCurry) {
-      if (!countOption || currySlots === 0) return false;
-      if (!curryPickerValid) return false;
+
+    if (isRiceCurry && countOption) {
+      if (currySlots === 0) return false;
+      if (withRiceMenu.length > 0 && selectedCurryIds.length !== currySlots) {
+        return false;
+      }
     }
+
     return staticOptions.every((option) => {
       if (!option.required) return true;
-      const key = option._id || option.name;
-      const chosen = selected[key] || [];
-      if (option.type === 'single' && option.choices.some((c) => c.label === 'ไม่ใส่')) {
-        return chosen.length > 0;
-      }
+      const chosen = selected[optionKey(option)] || [];
       return chosen.length > 0;
     });
-  }, [product, isRiceCurry, countOption, currySlots, curryPickerValid, staticOptions, selected]);
+  }, [
+    product,
+    isRiceCurry,
+    countOption,
+    currySlots,
+    withRiceMenu.length,
+    selectedCurryIds.length,
+    staticOptions,
+    selected,
+  ]);
 
   if (!product) return null;
 
   const toggleChoice = (option: ProductOption, choice: OptionChoice) => {
-    const key = option._id || option.name;
-    const choiceId = choice._id || choice.label;
+    const key = optionKey(option);
+    const choiceId = choiceKey(choice);
     const current = selected[key] || [];
 
     if (option.type === 'single') {
@@ -220,10 +234,10 @@ export default function MenuSelector({
     product.options.forEach((option) => {
       const filtered = filterOptionForSlot(option, productMealPeriod, mealPeriodSlot);
       if (!filtered) return;
-      const key = option._id || option.name;
+      const key = optionKey(option);
       const chosenIds = selected[key] || [];
       const choiceLabels = filtered.choices
-        .filter((c) => chosenIds.includes(c._id || c.label))
+        .filter((c) => chosenIds.includes(choiceKey(c)))
         .map((c) => c.label);
       if (choiceLabels.length > 0) {
         selectedChoices.push({ optionName: option.name, choiceLabels });
@@ -274,8 +288,8 @@ export default function MenuSelector({
       </div>
       <div className="space-y-2">
         {option.choices.map((choice) => {
-          const choiceId = choice._id || choice.label;
-          const isSelected = (selected[option._id || option.name] || []).includes(choiceId);
+          const choiceId = choiceKey(choice);
+          const isSelected = (selected[optionKey(option)] || []).includes(choiceId);
           return (
             <label
               key={choiceId}
@@ -293,7 +307,7 @@ export default function MenuSelector({
                 )}
                 <input
                   type={option.type === 'single' ? 'radio' : 'checkbox'}
-                  name={option._id || option.name}
+                  name={optionKey(option)}
                   checked={isSelected}
                   onChange={() => toggleChoice(option, choice)}
                   className="h-5 w-5 accent-accent"
@@ -438,6 +452,16 @@ export default function MenuSelector({
             <span className="text-navy">รวม</span>
             <span className="text-navy">{formatPrice(totalPrice)}</span>
           </div>
+          {!isValid && (
+            <p className="mb-2 text-center text-xs text-muted">
+              {isRiceCurry && countOption && currySlots > 0 && withRiceMenu.length > 0 &&
+              selectedCurryIds.length !== currySlots
+                ? `เลือกกับข้าวให้ครบ ${currySlots} อย่าง`
+                : isRiceCurry && countOption && currySlots === 0
+                  ? 'เลือกจำนวนแกงก่อน'
+                  : 'เลือกตัวเลือกที่จำเป็น (*) ให้ครบ'}
+            </p>
+          )}
           <Button onClick={handleAdd} disabled={!isValid} variant="secondary" className="w-full">
             เพิ่มลงตะกร้า
           </Button>
