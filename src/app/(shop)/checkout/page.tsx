@@ -107,12 +107,6 @@ export default function CheckoutPage() {
     setError('');
 
     try {
-      const statusRes = await fetch('/api/settings/meal-ordering');
-      const statusData = await statusRes.json();
-      if (!statusRes.ok || !statusData.open?.[mealPeriodSlot]) {
-        throw new Error('ขณะนี้ปิดรับออเดอร์รอบนี้แล้ว กรุณากลับไปเลือกเมนู');
-      }
-
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

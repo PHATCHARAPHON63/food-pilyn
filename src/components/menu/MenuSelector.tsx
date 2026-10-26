@@ -12,7 +12,10 @@ import Button from '@/components/ui/Button';
 import ProductMenuImage from '@/components/menu/ProductMenuImage';
 import { sanitizeMenuColor } from '@/lib/menu-color';
 import { formatPrice } from '@/lib/utils';
-import type { MealPeriodSlot } from '@/lib/meal-period';
+import {
+  choiceMatchesMealSlot,
+  type MealPeriodSlot,
+} from '@/lib/meal-period';
 import {
   WITH_RICE_CATEGORY,
   EXTRA_CATEGORY,
@@ -22,26 +25,31 @@ import {
   RICE_CURRY_CATEGORY,
   parseCurrySlotCount,
 } from '@/lib/rice-curry';
-import type { Product, ProductOption, OptionChoice, OrderItem } from '@/types';
+import type { Product, ProductOption, OptionChoice, OrderItem, MealPeriod } from '@/types';
 
 interface MenuSelectorProps {
   product: Product | null;
-  /** รอบที่ใช้บันทึกออเดอร์ (ไม่ใช้กรองเมนูที่แสดง) */
+  /** รอบพรีออเดอร์ (เช้า / กลางวัน) */
   mealPeriodSlot: MealPeriodSlot;
-  canOrder?: boolean;
   onClose: () => void;
   onAdd: (item: OrderItem) => void;
 }
 
-function displayOption(option: ProductOption): ProductOption | null {
-  if (option.choices.length === 0) return null;
-  return option;
+function filterOptionForSlot(
+  option: ProductOption,
+  productMealPeriod: MealPeriod | undefined,
+  slot: MealPeriodSlot
+): ProductOption | null {
+  const choices = option.choices.filter((c) =>
+    choiceMatchesMealSlot(c, productMealPeriod, slot)
+  );
+  if (choices.length === 0) return null;
+  return { ...option, choices };
 }
 
 export default function MenuSelector({
   product,
   mealPeriodSlot,
-  canOrder = true,
   onClose,
   onAdd,
 }: MenuSelectorProps) {
@@ -54,6 +62,7 @@ export default function MenuSelector({
   const [quantity, setQuantity] = useState(1);
 
   const isRiceCurry = product?.category === RICE_CURRY_CATEGORY;
+  const productMealPeriod = product?.mealPeriod;
   const currentProductId = product?._id;
   const resetKey = `${currentProductId || ''}-${mealPeriodSlot}`;
   const [lastResetKey, setLastResetKey] = useState(resetKey);
@@ -71,34 +80,34 @@ export default function MenuSelector({
       return;
     }
     setWithRiceLoading(true);
-    fetch(`/api/products?category=${WITH_RICE_CATEGORY}`)
+    fetch(`/api/products?category=${WITH_RICE_CATEGORY}&mealPeriod=${mealPeriodSlot}`)
       .then((res) => res.json())
       .then((data) => {
         setWithRiceMenu((data.products || []).filter((p: Product) => p.isAvailable));
       })
       .catch(() => setWithRiceMenu([]))
       .finally(() => setWithRiceLoading(false));
-  }, [product, isRiceCurry, currentProductId]);
+  }, [product, isRiceCurry, currentProductId, mealPeriodSlot]);
 
   useEffect(() => {
     if (!product) {
       setExtraMenu([]);
       return;
     }
-    fetch(`/api/products?category=${EXTRA_CATEGORY}`)
+    fetch(`/api/products?category=${EXTRA_CATEGORY}&mealPeriod=${mealPeriodSlot}`)
       .then((res) => res.json())
       .then((data) => {
         setExtraMenu((data.products || []).filter((p: Product) => p.isAvailable));
       })
       .catch(() => setExtraMenu([]));
-  }, [product, currentProductId]);
+  }, [product, currentProductId, mealPeriodSlot]);
 
   const countOption = useMemo(() => {
     if (!product || !isRiceCurry) return null;
     const raw = product.options.find((o) => o.name === CURRY_COUNT_OPTION_NAME) ?? null;
     if (!raw) return null;
-    return displayOption(raw);
-  }, [product, isRiceCurry]);
+    return filterOptionForSlot(raw, productMealPeriod, mealPeriodSlot);
+  }, [product, isRiceCurry, productMealPeriod, mealPeriodSlot]);
 
   const countOptionKey = countOption ? countOption._id || countOption.name : '';
 
@@ -121,8 +130,10 @@ export default function MenuSelector({
     const base = isRiceCurry
       ? product.options.filter((o) => o.name !== CURRY_COUNT_OPTION_NAME)
       : product.options;
-    return base.map((o) => displayOption(o)).filter((o): o is ProductOption => o !== null);
-  }, [product, isRiceCurry]);
+    return base
+      .map((o) => filterOptionForSlot(o, productMealPeriod, mealPeriodSlot))
+      .filter((o): o is ProductOption => o !== null);
+  }, [product, isRiceCurry, productMealPeriod, mealPeriodSlot]);
 
   const extrasTotal = useMemo(() => {
     return selectedExtraIds.reduce((sum, id) => {
@@ -135,18 +146,18 @@ export default function MenuSelector({
     if (!product) return 0;
     let adjustment = 0;
     product.options.forEach((option) => {
-      const shown = displayOption(option);
-      if (!shown) return;
+      const filtered = filterOptionForSlot(option, productMealPeriod, mealPeriodSlot);
+      if (!filtered) return;
       const key = option._id || option.name;
       const chosenIds = selected[key] || [];
-      shown.choices.forEach((choice) => {
+      filtered.choices.forEach((choice) => {
         if (chosenIds.includes(choice._id || choice.label)) {
           adjustment += choice.priceAdjustment;
         }
       });
     });
     return (product.basePrice + adjustment + extrasTotal) * quantity;
-  }, [product, selected, quantity, extrasTotal]);
+  }, [product, selected, quantity, productMealPeriod, mealPeriodSlot, extrasTotal]);
 
   const curryPickerValid =
     !isRiceCurry || (currySlots > 0 && selectedCurryIds.length === currySlots && withRiceMenu.length > 0);
@@ -207,11 +218,11 @@ export default function MenuSelector({
   const handleAdd = () => {
     const selectedChoices: OrderItem['selectedChoices'] = [];
     product.options.forEach((option) => {
-      const shown = displayOption(option);
-      if (!shown) return;
+      const filtered = filterOptionForSlot(option, productMealPeriod, mealPeriodSlot);
+      if (!filtered) return;
       const key = option._id || option.name;
       const chosenIds = selected[key] || [];
-      const choiceLabels = shown.choices
+      const choiceLabels = filtered.choices
         .filter((c) => chosenIds.includes(c._id || c.label))
         .map((c) => c.label);
       if (choiceLabels.length > 0) {
@@ -427,8 +438,8 @@ export default function MenuSelector({
             <span className="text-navy">รวม</span>
             <span className="text-navy">{formatPrice(totalPrice)}</span>
           </div>
-          <Button onClick={handleAdd} disabled={!isValid || !canOrder} variant="secondary" className="w-full">
-            {canOrder ? 'เพิ่มลงตะกร้า' : 'ปิดรับออเดอร์ในรอบนี้'}
+          <Button onClick={handleAdd} disabled={!isValid} variant="secondary" className="w-full">
+            เพิ่มลงตะกร้า
           </Button>
         </div>
       </div>
