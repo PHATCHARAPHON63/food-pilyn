@@ -54,6 +54,7 @@ const OrderSchema = new Schema<Order>(
     },
     deliverySequence: { type: Number },
     note: { type: String },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

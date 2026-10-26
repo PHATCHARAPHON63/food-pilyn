@@ -115,6 +115,8 @@ export interface Order {
   status: OrderStatus;
   deliverySequence?: number; // ลำดับจัดส่งหลัง optimize route
   note?: string;
+  /** ตั้งเมื่อแอดมินลบ (ซ่อน) — ไม่ลบจาก DB */
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

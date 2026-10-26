@@ -10,6 +10,7 @@ import Product from '@/models/Product';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { generateOrderNumber, isMongoId, isValidOrderNumber } from '@/lib/utils';
 import { productMatchesMealSlot, type MealPeriodSlot } from '@/lib/meal-period';
+import { ACTIVE_ORDER_FILTER } from '@/lib/order-query';
 
 function sanitizeItems(raw: unknown) {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
 
     await connectDB();
 
-    const query: Record<string, unknown> = {};
+    const query: Record<string, unknown> = { ...ACTIVE_ORDER_FILTER };
     if (statusParam) {
       query.status = { $in: statusParam.split(',') };
     }

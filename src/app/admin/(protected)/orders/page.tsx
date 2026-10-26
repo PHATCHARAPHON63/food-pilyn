@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, Radio } from 'lucide-react';
+import { RefreshCw, Radio, Trash2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import OrderStatusBadge from '@/components/order/OrderStatusBadge';
@@ -30,6 +30,7 @@ export default function AdminOrdersPage() {
   const [now, setNow] = useState<number>(0);
   const [newOrderAlert, setNewOrderAlert] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const previousOrderIds = useRef<Set<string>>(new Set());
 
   /**
@@ -104,8 +105,33 @@ export default function AdminOrdersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    if (res.ok) fetchOrders();
+    if (res.ok) fetchOrders(true);
     else setFetchError('อัปเดตสถานะไม่สำเร็จ');
+  };
+
+  const deleteOrder = async (order: Order) => {
+    const ok = confirm(
+      `ซ่อนออเดอร์ ${order.orderNumber} ของ ${order.customer.name} จากรายการ?\nข้อมูลยังอยู่ในระบบ แต่จะไม่แสดงในแอดมิน`
+    );
+    if (!ok) return;
+
+    setDeletingId(order._id);
+    setFetchError('');
+    try {
+      const res = await fetch(`/api/orders/${order._id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFetchError(data.error || 'ซ่อนออเดอร์ไม่สำเร็จ');
+        return;
+      }
+      previousOrderIds.current.delete(order._id);
+      setOrders((prev) => prev.filter((o) => o._id !== order._id));
+      setLastUpdated(new Date());
+    } catch {
+      setFetchError('ซ่อนออเดอร์ไม่สำเร็จ');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const secondsAgo = lastUpdated
@@ -161,7 +187,19 @@ export default function AdminOrdersPage() {
                   {order.customer.name} · {order.customer.phone}
                 </p>
               </div>
-              <OrderStatusBadge status={order.status} />
+              <div className="flex items-center gap-2">
+                <OrderStatusBadge status={order.status} />
+                <button
+                  type="button"
+                  onClick={() => deleteOrder(order)}
+                  disabled={deletingId === order._id}
+                  className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  aria-label="ซ่อนออเดอร์"
+                  title="ซ่อนจากรายการ"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl bg-surface p-3 text-sm">

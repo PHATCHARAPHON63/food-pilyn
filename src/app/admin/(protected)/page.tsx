@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import connectDB from '@/lib/db';
 import Order from '@/models/Order';
+import { ACTIVE_ORDER_FILTER } from '@/lib/order-query';
 import Product from '@/models/Product';
 import Card from '@/components/ui/Card';
 import OrderStatusBadge from '@/components/order/OrderStatusBadge';
@@ -26,7 +27,10 @@ export default async function AdminDashboardPage() {
   const endOfDay = new Date();
   endOfDay.setHours(23, 59, 59, 999);
 
-  const todayOrders = await Order.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).sort({ createdAt: -1 });
+  const todayOrders = await Order.find({
+    ...ACTIVE_ORDER_FILTER,
+    createdAt: { $gte: startOfDay, $lte: endOfDay },
+  }).sort({ createdAt: -1 });
   const totalSales = todayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
   const pendingCount = todayOrders.filter((o) => o.status === 'pending').length;
   const productCount = await Product.countDocuments();
