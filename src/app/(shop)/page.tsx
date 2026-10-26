@@ -5,7 +5,17 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, ChefHat, UtensilsCrossed, PlusCircle, Sun, Coffee, ArrowLeft } from 'lucide-react';
+import {
+  ShoppingCart,
+  ChefHat,
+  UtensilsCrossed,
+  PlusCircle,
+  Sun,
+  Coffee,
+  ArrowLeft,
+  ChevronRight,
+  Hand,
+} from 'lucide-react';
 import {
   productMatchesMealSlot,
   MEAL_SLOT_LABELS,
@@ -206,52 +216,89 @@ export default function MenuPage() {
   }
 
   if (!roundConfirmed || !preorderSlot) {
+    const renderRoundPickCard = (id: MealPeriodSlot, Icon: typeof Coffee, large?: boolean) => {
+      const windowLabel = mealOrdering
+        ? formatSlotWindow(mealOrdering.schedule[id])
+        : id === 'morning'
+          ? '06:00–11:00'
+          : '11:00–14:00';
+      const count = CATEGORY_ORDER.reduce((n, cat) => n + (previewBySlot[id][cat]?.length ?? 0), 0);
+      return (
+        <button
+          key={id}
+          type="button"
+          onClick={() => confirmRound(id)}
+          className={`flex w-full items-center gap-4 rounded-2xl border-2 border-accent bg-card text-left shadow-md transition-transform hover:scale-[1.01] active:scale-[0.99] ${
+            large ? 'p-5 sm:p-6' : 'p-4'
+          }`}
+        >
+          <div
+            className={`flex shrink-0 items-center justify-center rounded-2xl bg-navy text-accent ${
+              large ? 'h-14 w-14' : 'h-12 w-12'
+            }`}
+          >
+            <Icon className={large ? 'h-7 w-7' : 'h-6 w-6'} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className={`font-bold text-navy ${large ? 'text-lg' : 'text-base'}`}>
+              {MEAL_SLOT_LABELS[id]}
+            </p>
+            <p className="text-sm text-muted">จัดส่งประมาณ {windowLabel} น.</p>
+            <p className="mt-0.5 text-xs text-muted">{count} เมนูในรอบนี้</p>
+          </div>
+          <span
+            className={`flex shrink-0 items-center gap-1 font-semibold text-accent ${
+              large ? 'text-sm' : 'text-xs'
+            }`}
+          >
+            เลือก
+            <ChevronRight className="h-4 w-4" />
+          </span>
+        </button>
+      );
+    };
+
     return (
-      <div className="mx-auto max-w-3xl px-4 pb-10 pt-4">
-        <div className="mb-4 rounded-2xl bg-navy px-4 py-4 text-navy-foreground shadow-md sm:p-5">
-          <h1 className="text-lg font-bold sm:text-xl">สั่งอาหารวันนี้</h1>
-          <p className="mt-1 text-xs text-white/85 sm:text-sm">
-            ดูรายการเมนูด้านล่างได้เลย — กดเลือกรอบรับเพื่อเริ่มสั่ง
-          </p>
+      <div className="mx-auto max-w-3xl px-4 pb-36 pt-4 sm:pb-10">
+        <div className="mb-5 overflow-hidden rounded-2xl border-2 border-accent bg-accent-soft/50 shadow-sm">
+          <div className="bg-navy px-4 py-3 text-navy-foreground sm:px-5">
+            <div className="flex items-start gap-3">
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-navy"
+                aria-hidden
+              >
+                1
+              </span>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-accent">เริ่มสั่งอาหาร</p>
+                <h1 className="text-lg font-bold sm:text-xl">เลือกรอบรับอาหารก่อน</h1>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-white/85 sm:text-sm">
+                  <Hand className="h-4 w-4 shrink-0 text-accent" />
+                  กดปุ่มมื้อเช้าหรือมื้อกลางวันเพื่อเข้าเมนูและสั่งได้
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3 p-4 sm:p-5">
+            {PREVIEW_SLOTS.map(({ id, icon: Icon }) => renderRoundPickCard(id, Icon, true))}
+          </div>
           {mealOrdering && (
-            <p className="mt-1 text-[11px] text-white/70 sm:text-xs">
+            <p className="border-t border-accent/20 px-4 py-2 text-center text-[11px] text-muted sm:text-xs">
               เวลาไทย {mealOrdering.bangkokTime} ({THAILAND_TIMEZONE})
             </p>
           )}
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {PREVIEW_SLOTS.map(({ id, icon: Icon }) => {
-              const windowLabel = mealOrdering
-                ? formatSlotWindow(mealOrdering.schedule[id])
-                : id === 'morning'
-                  ? '06:00–11:00'
-                  : '11:00–14:00';
-              const count = CATEGORY_ORDER.reduce(
-                (n, cat) => n + (previewBySlot[id][cat]?.length ?? 0),
-                0
-              );
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => confirmRound(id)}
-                  className="rounded-xl bg-accent px-4 py-3 text-left text-accent-foreground transition-opacity hover:opacity-95"
-                >
-                  <span className="flex items-center gap-2 font-semibold">
-                    <Icon className="h-4 w-4" />
-                    สั่ง{MEAL_SLOT_LABELS[id]}
-                  </span>
-                  <span className="mt-1 block text-xs opacity-90">
-                    จัดส่งประมาณ {windowLabel} น. · {count} เมนู
-                  </span>
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {loadError && <div className="py-8 text-center text-red-600">{loadError}</div>}
 
-        <div className="space-y-8">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-medium text-muted">
+            ดูเมนูล่วงหน้า
+          </span>
+          <p className="text-sm text-muted">ยังสั่งไม่ได้จนกว่าจะเลือกรอบด้านบน</p>
+        </div>
+
+        <div className="space-y-8 opacity-[0.92]">
           {PREVIEW_SLOTS.map(({ id, icon: Icon }) => {
             const grouped = previewBySlot[id];
             const categories = CATEGORY_ORDER.filter((cat) => (grouped[cat]?.length ?? 0) > 0);
@@ -293,6 +340,25 @@ export default function MenuPage() {
         {!loadError && products.length === 0 && (
           <div className="py-12 text-center text-muted">ยังไม่มีเมนูในระบบ</div>
         )}
+
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 px-4 py-3 shadow-[0_-8px_24px_rgba(11,31,58,0.12)] backdrop-blur-sm sm:hidden">
+          <p className="mb-2 text-center text-xs font-semibold text-navy">เลือกรอบรับอาหารเพื่อสั่ง</p>
+          <div className="grid grid-cols-2 gap-2">
+            {PREVIEW_SLOTS.map(({ id, icon: Icon }) => (
+              <Button
+                key={id}
+                type="button"
+                size="sm"
+                variant={id === 'morning' ? 'secondary' : 'primary'}
+                className="w-full"
+                onClick={() => confirmRound(id)}
+              >
+                <Icon className="mr-1 h-4 w-4" />
+                {MEAL_SLOT_LABELS[id]}
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
