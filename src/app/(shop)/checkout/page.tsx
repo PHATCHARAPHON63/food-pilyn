@@ -50,9 +50,14 @@ export default function CheckoutPage() {
     sessionStorage.setItem('orderNumber', next);
     setOrderNumber(next);
     const slot = sessionStorage.getItem('mealPeriodSlot');
-    if (slot === 'morning' || slot === 'lunch') setMealPeriodSlot(slot);
+    const roundOk = sessionStorage.getItem('mealRoundConfirmed') === '1';
+    if (!roundOk || (slot !== 'morning' && slot !== 'lunch')) {
+      router.replace('/');
+      return;
+    }
+    setMealPeriodSlot(slot);
     setReady(true);
-  }, []);
+  }, [router]);
 
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
   const changeAmount =

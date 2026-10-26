@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx src/scripts/seed.ts"
+    "seed": "tsx src/scripts/seed.ts",
+    "add-rice-curry-options": "tsx src/scripts/add-rice-curry-options.ts"
   },
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.4.2",

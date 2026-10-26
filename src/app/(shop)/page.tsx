@@ -1,14 +1,12 @@
 // ============================================
-// หน้าเลือกสินค้า (Menu Page)
-// พรีออเดอร์: เลือกรอบเช้า/กลางวัน สั่งได้ตลอด แสดงเมนูตามช่วงขายของแต่ละรายการ
+// หน้าเลือกสินค้า — เลือกรอบส่งก่อน แล้วแสดงเมนูตามช่วงขาย
 // ============================================
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, ChefHat, UtensilsCrossed, PlusCircle, Sun, Coffee } from 'lucide-react';
+import { ShoppingCart, ChefHat, UtensilsCrossed, PlusCircle, Sun, Coffee, ArrowLeft } from 'lucide-react';
 import {
-  detectMealPeriodSlot,
   productMatchesMealSlot,
   MEAL_SLOT_LABELS,
   type MealPeriodSlot,
@@ -23,6 +21,8 @@ import MenuSelector from '@/components/menu/MenuSelector';
 import Button from '@/components/ui/Button';
 import { formatPrice, generateOrderNumber, isMongoId, isValidOrderNumber, sanitizeCartItems } from '@/lib/utils';
 import type { Product, OrderItem } from '@/types';
+
+const ROUND_CONFIRMED_KEY = 'mealRoundConfirmed';
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'rice-curry': <ChefHat className="h-4 w-4" />,
@@ -40,6 +40,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['rice-curry', 'side-dish', 'extra', 'other'] as const;
 
+const PREVIEW_SLOTS: { id: MealPeriodSlot; icon: typeof Coffee }[] = [
+  { id: 'morning', icon: Coffee },
+  { id: 'lunch', icon: Sun },
+];
+
+function groupProductsForSlot(products: Product[], slot: MealPeriodSlot): Record<string, Product[]> {
+  const acc: Record<string, Product[]> = {};
+  for (const product of products) {
+    if ((product.category as string) === 'drink') continue;
+    if (!product.isAvailable) continue;
+    if (!productMatchesMealSlot(product, slot)) continue;
+    const key = product.category;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(product);
+  }
+  return acc;
+}
+
 export default function MenuPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -49,7 +67,8 @@ export default function MenuPage() {
   const [cartReady, setCartReady] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [mealOrdering, setMealOrdering] = useState<MealOrderingStatus | null>(null);
-  const [preorderSlot, setPreorderSlot] = useState<MealPeriodSlot>(() => detectMealPeriodSlot());
+  const [preorderSlot, setPreorderSlot] = useState<MealPeriodSlot | null>(null);
+  const [roundConfirmed, setRoundConfirmed] = useState(false);
 
   useEffect(() => {
     try {
@@ -59,9 +78,12 @@ export default function MenuPage() {
     } catch {
       setCart([]);
     }
+
     const savedSlot = sessionStorage.getItem('mealPeriodSlot');
-    if (savedSlot === 'morning' || savedSlot === 'lunch') {
+    const confirmed = sessionStorage.getItem(ROUND_CONFIRMED_KEY) === '1';
+    if (confirmed && (savedSlot === 'morning' || savedSlot === 'lunch')) {
       setPreorderSlot(savedSlot);
+      setRoundConfirmed(true);
     }
     setCartReady(true);
   }, []);
@@ -76,8 +98,11 @@ export default function MenuPage() {
   }, [cart, cartReady]);
 
   useEffect(() => {
-    sessionStorage.setItem('mealPeriodSlot', preorderSlot);
-  }, [preorderSlot]);
+    if (preorderSlot && roundConfirmed) {
+      sessionStorage.setItem('mealPeriodSlot', preorderSlot);
+      sessionStorage.setItem(ROUND_CONFIRMED_KEY, '1');
+    }
+  }, [preorderSlot, roundConfirmed]);
 
   useEffect(() => {
     fetch('/api/settings/meal-ordering')
@@ -111,7 +136,7 @@ export default function MenuPage() {
   }, []);
 
   useEffect(() => {
-    if (!cartReady || products.length === 0) return;
+    if (!cartReady || !preorderSlot || products.length === 0) return;
     setCart((prev) =>
       prev.filter((item) => {
         const id = typeof item.product === 'string' ? item.product : '';
@@ -121,6 +146,22 @@ export default function MenuPage() {
     );
   }, [preorderSlot, products, cartReady]);
 
+  const confirmRound = (slot: MealPeriodSlot) => {
+    setPreorderSlot(slot);
+    setRoundConfirmed(true);
+    setSelectedProduct(null);
+  };
+
+  const backToRoundPicker = () => {
+    setRoundConfirmed(false);
+    setPreorderSlot(null);
+    setSelectedProduct(null);
+    setCart([]);
+    sessionStorage.removeItem('cart');
+    sessionStorage.removeItem(ROUND_CONFIRMED_KEY);
+    sessionStorage.removeItem('mealPeriodSlot');
+  };
+
   const addToCart = (item: OrderItem) => {
     setCart((prev) => [...prev, item]);
   };
@@ -128,16 +169,17 @@ export default function MenuPage() {
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
 
   const groupedProducts = useMemo(() => {
-    const acc: Record<string, Product[]> = {};
-    for (const product of products) {
-      if ((product.category as string) === 'drink') continue;
-      if (!productMatchesMealSlot(product, preorderSlot)) continue;
-      const key = product.category;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(product);
-    }
-    return acc;
+    if (!preorderSlot) return {};
+    return groupProductsForSlot(products, preorderSlot);
   }, [products, preorderSlot]);
+
+  const previewBySlot = useMemo(
+    () => ({
+      morning: groupProductsForSlot(products, 'morning'),
+      lunch: groupProductsForSlot(products, 'lunch'),
+    }),
+    [products]
+  );
 
   const orderedCategories = useMemo(
     () => CATEGORY_ORDER.filter((cat) => (groupedProducts[cat]?.length ?? 0) > 0),
@@ -145,9 +187,10 @@ export default function MenuPage() {
   );
 
   const goToCheckout = () => {
-    if (cart.length === 0) return;
+    if (!preorderSlot || cart.length === 0) return;
     sessionStorage.setItem('cart', JSON.stringify(cart));
     sessionStorage.setItem('mealPeriodSlot', preorderSlot);
+    sessionStorage.setItem(ROUND_CONFIRMED_KEY, '1');
     if (!isValidOrderNumber(sessionStorage.getItem('orderNumber'))) {
       sessionStorage.setItem('orderNumber', generateOrderNumber());
     }
@@ -162,50 +205,114 @@ export default function MenuPage() {
     );
   }
 
-  return (
-    <div className={`mx-auto max-w-3xl px-4 pt-4 ${cart.length > 0 ? 'pb-28' : 'pb-8'}`}>
-      <div className="mb-4 rounded-2xl bg-navy px-4 py-3 text-navy-foreground shadow-md sm:mb-6 sm:p-5">
-        <div className="mb-2 hidden h-1 w-12 rounded-full bg-accent sm:block" />
-        <h2 className="text-lg font-bold sm:text-xl">สั่งอาหาร (พรีออเดอร์)</h2>
-        <p className="text-xs text-white/80 sm:text-sm">
-          สั่งได้ตลอดเวลา — เลือกรอบมื้อที่ต้องการรับ แล้วเลือกเมนูในช่วงนั้น
-        </p>
-        {mealOrdering && (
-          <p className="mt-1 text-[11px] text-white/70 sm:text-xs">
-            เวลาไทย {mealOrdering.bangkokTime} ({THAILAND_TIMEZONE})
+  if (!roundConfirmed || !preorderSlot) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 pb-10 pt-4">
+        <div className="mb-4 rounded-2xl bg-navy px-4 py-4 text-navy-foreground shadow-md sm:p-5">
+          <h1 className="text-lg font-bold sm:text-xl">สั่งอาหารวันนี้</h1>
+          <p className="mt-1 text-xs text-white/85 sm:text-sm">
+            ดูรายการเมนูด้านล่างได้เลย — กดเลือกรอบรับเพื่อเริ่มสั่ง
           </p>
-        )}
-
-        <div className="mt-3">
-          <p className="mb-2 text-[11px] font-medium text-white/60 sm:text-xs">พรีออเดอร์รอบ</p>
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                { id: 'morning' as const, icon: Coffee },
-                { id: 'lunch' as const, icon: Sun },
-              ] as const
-            ).map(({ id, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setPreorderSlot(id)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${
-                  preorderSlot === id
-                    ? 'bg-accent text-navy'
-                    : 'bg-white/15 text-white hover:bg-white/25'
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {MEAL_SLOT_LABELS[id]}
-              </button>
-            ))}
+          {mealOrdering && (
+            <p className="mt-1 text-[11px] text-white/70 sm:text-xs">
+              เวลาไทย {mealOrdering.bangkokTime} ({THAILAND_TIMEZONE})
+            </p>
+          )}
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {PREVIEW_SLOTS.map(({ id, icon: Icon }) => {
+              const windowLabel = mealOrdering
+                ? formatSlotWindow(mealOrdering.schedule[id])
+                : id === 'morning'
+                  ? '06:00–11:00'
+                  : '11:00–14:00';
+              const count = CATEGORY_ORDER.reduce(
+                (n, cat) => n + (previewBySlot[id][cat]?.length ?? 0),
+                0
+              );
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => confirmRound(id)}
+                  className="rounded-xl bg-accent px-4 py-3 text-left text-accent-foreground transition-opacity hover:opacity-95"
+                >
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Icon className="h-4 w-4" />
+                    สั่ง{MEAL_SLOT_LABELS[id]}
+                  </span>
+                  <span className="mt-1 block text-xs opacity-90">
+                    จัดส่งประมาณ {windowLabel} น. · {count} เมนู
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
+        {loadError && <div className="py-8 text-center text-red-600">{loadError}</div>}
+
+        <div className="space-y-8">
+          {PREVIEW_SLOTS.map(({ id, icon: Icon }) => {
+            const grouped = previewBySlot[id];
+            const categories = CATEGORY_ORDER.filter((cat) => (grouped[cat]?.length ?? 0) > 0);
+            if (categories.length === 0) return null;
+            const windowLabel = mealOrdering
+              ? formatSlotWindow(mealOrdering.schedule[id])
+              : id === 'morning'
+                ? '06:00–11:00'
+                : '11:00–14:00';
+            return (
+              <section key={id}>
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-border pb-2">
+                  <div className="flex items-center gap-2 text-lg font-semibold text-navy">
+                    <Icon className="h-5 w-5 text-accent" />
+                    เมนู{MEAL_SLOT_LABELS[id]}
+                  </div>
+                  <p className="text-xs text-muted">รอบจัดส่งประมาณ {windowLabel} น.</p>
+                </div>
+                <div className="space-y-5">
+                  {categories.map((category) => (
+                    <div key={category}>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium text-navy">
+                        <span className="text-accent">{CATEGORY_ICONS[category]}</span>
+                        {CATEGORY_LABELS[category]}
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {(grouped[category] || []).map((product) => (
+                          <MenuCard key={`${id}-${product._id}`} product={product} preview />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        {!loadError && products.length === 0 && (
+          <div className="py-12 text-center text-muted">ยังไม่มีเมนูในระบบ</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mx-auto max-w-3xl px-4 pt-4 ${cart.length > 0 ? 'pb-28' : 'pb-8'}`}>
+      <div className="mb-4 rounded-2xl bg-navy px-4 py-3 text-navy-foreground shadow-md sm:mb-6 sm:p-5">
+        <button
+          type="button"
+          onClick={backToRoundPicker}
+          className="mb-2 flex items-center gap-1 text-xs text-white/75 hover:text-white"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          เปลี่ยนรอบรับ
+        </button>
+        <h2 className="text-lg font-bold sm:text-xl">สั่งอาหาร · {MEAL_SLOT_LABELS[preorderSlot]}</h2>
+        <p className="text-xs text-white/80 sm:text-sm">แสดงเมนูตามช่วงขายของรอบที่เลือก</p>
         {mealOrdering && (
-          <p className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-[11px] text-white/85 sm:text-xs">
-            รอบจัดส่งโดยประมาณ — เช้า {formatSlotWindow(mealOrdering.schedule.morning)} น. · กลางวัน{' '}
-            {formatSlotWindow(mealOrdering.schedule.lunch)} น.
+          <p className="mt-2 rounded-lg bg-white/10 px-3 py-2 text-[11px] text-white/85 sm:text-xs">
+            รอบจัดส่งโดยประมาณ {formatSlotWindow(mealOrdering.schedule[preorderSlot])} น.
           </p>
         )}
       </div>
@@ -234,7 +341,7 @@ export default function MenuPage() {
       {loadError && <div className="py-12 text-center text-red-600">{loadError}</div>}
       {!loadError && orderedCategories.length === 0 && products.length > 0 && (
         <div className="py-12 text-center text-muted">
-          ไม่มีเมนูสำหรับ{MEAL_SLOT_LABELS[preorderSlot]}ในรอบนี้ — ลองเปลี่ยนรอบพรีออเดอร์
+          ไม่มีเมนูสำหรับ{MEAL_SLOT_LABELS[preorderSlot]} — ลองเปลี่ยนรอบรับ
         </div>
       )}
       {!loadError && products.length === 0 && (
